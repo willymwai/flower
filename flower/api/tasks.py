@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import json
 import logging
 
@@ -20,18 +18,25 @@ from ..utils import tasks
 from ..views import BaseHandler
 from ..utils.broker import Broker
 from ..api.control import ControlHandler
+from collections import OrderedDict
 
 
 logger = logging.getLogger(__name__)
 
 
 class BaseTaskHandler(BaseHandler):
+    DATE_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
     def get_task_args(self):
         try:
             body = self.request.body
             options = json_decode(body) if body else {}
         except ValueError as e:
             raise HTTPError(400, str(e))
+
+        if not isinstance(options, dict):
+            raise HTTPError(400, 'invalid options')
+
         args = options.pop('args', [])
         kwargs = options.pop('kwargs', {})
 
@@ -153,7 +158,6 @@ Execute a task by name and wait results
 
 
 class TaskAsyncApply(BaseTaskHandler):
-    DATE_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
     @web.authenticated
     def post(self, taskname):
@@ -401,14 +405,18 @@ Return length of all active queues
         if app.transport == 'amqp' and app.options.broker_api:
             http_api = app.options.broker_api
 
-        broker = Broker(app.capp.connection().as_uri(include_password=True),
-                        http_api=http_api, broker_options=broker_options)
+        broker_use_ssl = None
+        if self.capp.conf.BROKER_USE_SSL:
+            broker_use_ssl = self.capp.conf.BROKER_USE_SSL
 
-        queue_names = ControlHandler.get_active_queue_names()
+        broker = Broker(app.capp.connection().as_uri(include_password=True),
+                        http_api=http_api, broker_options=broker_options, broker_use_ssl=broker_use_ssl)
+
+        queue_names = self.get_active_queue_names()
 
         if not queue_names:
             queue_names = set([self.capp.conf.CELERY_DEFAULT_QUEUE]) |\
-                        set([q.name for q in self.capp.conf.CELERY_QUEUES or [] if q.name])
+                set([q.name for q in self.capp.conf.CELERY_QUEUES or [] if q.name])
 
         queues = yield broker.queues(sorted(queue_names))
         self.write({'active_queues': queues})
@@ -463,7 +471,8 @@ List tasks
           "succeeded": 1398505411.124802,
           "timestamp": 1398505411.124802,
           "traceback": null,
-          "uuid": "e42ceb2d-8730-47b5-8b4d-8e0d2a1ef7c9"
+          "uuid": "e42ceb2d-8730-47b5-8b4d-8e0d2a1ef7c9",
+          "worker": "celery@worker1"
       },
       "f67ea225-ae9e-42a8-90b0-5de0b24507e0": {
           "args": "[1, 2]",
@@ -489,11 +498,14 @@ List tasks
           "succeeded": 1398505395.341089,
           "timestamp": 1398505395.341089,
           "traceback": null,
-          "uuid": "f67ea225-ae9e-42a8-90b0-5de0b24507e0"
+          "uuid": "f67ea225-ae9e-42a8-90b0-5de0b24507e0",
+          "worker": "celery@worker1"
       }
   }
 
 :query limit: maximum number of tasks
+:query offset: skip first n tasks
+:query sort_by: sort tasks by attribute (name, state, received, started)
 :query workername: filter task by workername
 :query taskname: filter tasks by taskname
 :query state: filter tasks by state
@@ -505,27 +517,32 @@ List tasks
         """
         app = self.application
         limit = self.get_argument('limit', None)
+        offset = self.get_argument('offset', default=0, type=int)
         worker = self.get_argument('workername', None)
         type = self.get_argument('taskname', None)
         state = self.get_argument('state', None)
         received_start = self.get_argument('received_start', None)
         received_end = self.get_argument('received_end', None)
+        sort_by = self.get_argument('sort_by', None)
 
         limit = limit and int(limit)
+        offset = max(offset, 0)
         worker = worker if worker != 'All' else None
         type = type if type != 'All' else None
         state = state if state != 'All' else None
 
         result = []
         for task_id, task in tasks.iter_tasks(
-                app.events, limit=limit, type=type,
+                app.events, limit=limit, offset=offset, sort_by=sort_by, type=type,
                 worker=worker, state=state,
                 received_start=received_start,
                 received_end=received_end):
             task = tasks.as_dict(task)
-            task.pop('worker', None)
+            worker = task.pop('worker', None)
+            if worker is not None:
+                task['worker'] = worker.hostname
             result.append((task_id, task))
-        self.write(dict(result))
+        self.write(OrderedDict(result))
 
 
 class ListTaskTypes(BaseTaskHandler):

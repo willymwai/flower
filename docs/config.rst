@@ -55,15 +55,17 @@ For a full list of options see: ::
 address
 ~~~~~~~
 
-Run the http server on a given address
+Run the http server on a given address. Address may be either an IP address or hostname.
+If it’s a hostname, the server will listen on all IP addresses associated with the name.
+Address may be an empty string or None to listen on all available interfaces.
 
 .. _auth:
 
 auth
 ~~~~
 
-Enables Google OpenID authentication. `auth` is a regexp of emails
-to grant access. For more info see :ref:`google-openid`
+Enables authentication. `auth` is a regexp of emails to grant access.
+For more info see :ref:`authentication`.
 
 .. _auto_refresh:
 
@@ -220,6 +222,15 @@ port
 
 Run the http server on a given port (by default, `port=5555`)
 
+.. _state_save_interval:
+
+state_save_interval
+~~~~~~~~~~~~~~~~~~
+
+Sets the interval for saving state. state_save_interval=0 means
+that periodic saving is disabled (by default, `state_save_interval=0`
+in milliseconds)
+
 .. _xheaders:
 
 xheaders
@@ -267,21 +278,8 @@ For example to access Flower on http://example.com/flower run it with: ::
 
     $ flower --url_prefix=flower
 
-And use the following `nginx` configuration:
+NOTE: The old `nginx` rewrite is no longer needed
 
-.. code-block:: nginx
-
-    server {
-        listen 80;
-        server_name example.com;
-
-        location /flower/ {
-            rewrite ^/flower/(.*)$ /$1 break;
-            proxy_pass http://example.com:5555;
-            proxy_set_header Host $host;
-        }
-
-    }
 
 .. _unix_socket:
 
@@ -306,5 +304,15 @@ Sets authentication provider
 
   - Google `flower.views.auth.GoogleAuth2LoginHandler`
   - GitHub `flower.views.auth.GithubLoginHandler`
+  - GitLab `flower.views.auth.GitLabLoginHandler`
 
 See `Authentication` for usage examples
+
+.. _purge_offline_workers:
+
+purge_offline_workers
+~~~~~~~~~~~~~~~~~~~~~
+
+Time (in seconds) after which offline workers are automatically removed from dashboard.
+
+If omitted, offline workers remain on the dashboard.

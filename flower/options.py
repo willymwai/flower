@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import types
 
 from tornado.options import define
@@ -37,6 +35,8 @@ define("db", type=str, default='flower',
        help="flower database file")
 define("persistent", type=bool, default=False,
        help="enable persistent mode")
+define("state_save_interval", type=int, default=0,
+       help="state save interval (in milliseconds)")
 define("broker_api", type=str, default=None,
        help="inspect broker e.g. http://guest:guest@localhost:15672/api/")
 define("ca_certs", type=str, default=None,
@@ -49,6 +49,8 @@ define("xheaders", type=bool, default=False,
        help="enable support for the 'X-Real-Ip' and 'X-Scheme' headers.")
 define("auto_refresh", default=True,
        help="refresh dashboards", type=bool)
+define("purge_offline_workers", default=None, type=int,
+       help="time (in seconds) after which offline workers are purged from dashboard")
 define("cookie_secret", type=str, default=None,
        help="secure cookie secret")
 define("conf", default=DEFAULT_CONFIG_FILE,

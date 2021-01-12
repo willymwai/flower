@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block navbar %}
-  {% module Template("navbar.html", active_tab="dashboard") %}
+  {% module Template("navbar.html", active_tab="dashboard")%}
 {% end %}
 
 {% block container %}
@@ -49,4 +49,10 @@
         </div>
     </div>
 
+{% end %}
+
+{% block extra_scripts %}
+<script type="text/javascript">
+  var autorefresh = {{ autorefresh }};
+</script>
 {% end %}

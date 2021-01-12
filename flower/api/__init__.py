@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import tornado.websocket
 
 
@@ -22,3 +20,6 @@ class BaseWebSocketHandler(tornado.websocket.WebSocketHandler):
     def send_message(cls, message):
         for l in cls.listeners:
             l.write_message(message)
+
+    def check_origin(self, origin):
+        return True
